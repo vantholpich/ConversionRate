@@ -1,28 +1,24 @@
-import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, StatusBar, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, withSpring, withSequence } from 'react-native-reanimated';
 
-// Modern Design Theme Constants
-const COLORS = {
-  background: '#0D0D12',     // Very dark base
-  cardLayer1: '#1A1A24',     // First layered panel
-  cardLayer2: '#242430',     // Inner inputs layer
-  accent: '#OC79FE',         // Strong primary blue (iOS like but vibrant)
-  accentBright: '#2F8FFF',   // Lighter blue for pressed states
-  textPrimary: '#FFFFFF',
-  textSecondary: '#8E8E9F',
-  danger: '#FF453A',
-};
+// Sample colors based on the image
+const LEFT_COLOR = '#FF0D2A';
+const RIGHT_COLOR = '#4E000B';
+const NUMPAD_BG = '#FF0D2A';
 
 export default function Index() {
-  const [amount, setAmount] = useState('0');
+  const insets = useSafeAreaInsets();
+  
+  const [amount, setAmount] = useState('4000');
   const [convertedAmount, setConvertedAmount] = useState('0.00');
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
-  const [isAudToUsd, setIsAudToUsd] = useState(true);
+  const [isAudToUsd, setIsAudToUsd] = useState(true); // Left side is AUD, right is USD
 
-  // Animations
-  const swapAnimation = useRef(new Animated.Value(0)).current;
+  // Animation for the swap bulge
+  const swapScale = useSharedValue(1);
 
   const fetchRate = async () => {
     try {
@@ -32,7 +28,8 @@ export default function Index() {
       const data = await response.json();
       setExchangeRate(data.rates[to]);
     } catch (error) {
-      console.error('Error fetching exchange rate, using fallback', error);
+      console.error('Error fetching rate', error);
+      // Fallbacks roughly matching the image
       setExchangeRate(isAudToUsd ? 0.65 : 1.54);
     }
   };
@@ -47,6 +44,15 @@ export default function Index() {
       setConvertedAmount((numAmount * exchangeRate).toFixed(2));
     }
   }, [amount, exchangeRate]);
+
+  const formatNumber = (numStr: string) => {
+    if (!numStr) return '0';
+    const parts = numStr.split('.');
+    const intPart = parseInt(parts[0], 10);
+    const formattedInt = isNaN(intPart) ? '0' : intPart.toLocaleString('en-US');
+    if (parts.length > 1) return `${formattedInt}.${parts[1]}`;
+    return formattedInt;
+  };
 
   const handleKeyPress = (key: string) => {
     if (key === 'C') {
@@ -63,322 +69,247 @@ export default function Index() {
   };
 
   const swapCurrencies = () => {
-    // Spin animation
-    Animated.timing(swapAnimation, {
-      toValue: 1,
-      duration: 300,
-      easing: Easing.inOut(Easing.ease),
-      useNativeDriver: true,
-    }).start(() => swapAnimation.setValue(0));
-
+    swapScale.value = withSequence(
+      withTiming(0.8, { duration: 100 }),
+      withSpring(1)
+    );
     setIsAudToUsd(!isAudToUsd);
     setAmount('0');
   };
 
-  const spin = swapAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '180deg'],
+  const animatedBulgeStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { scale: swapScale.value }
+      ],
+    };
   });
 
-  // Reusable Animated Button component for motion everywhere
-  const AnimatedPressable = ({ 
-    onPress, 
-    children, 
-    style, 
-    pressedStyle,
-    activeOpacity = 0.8
-  }: any) => {
-    const scale = useRef(new Animated.Value(1)).current;
-
-    const animateIn = () => {
-      Animated.spring(scale, {
-        toValue: 0.92,
-        useNativeDriver: true,
-        speed: 50,
-      }).start();
-    };
-
-    const animateOut = () => {
-      Animated.spring(scale, {
-        toValue: 1,
-        useNativeDriver: true,
-        speed: 50,
-      }).start();
-    };
-
-    return (
-      <Pressable
-        onPressIn={animateIn}
-        onPressOut={animateOut}
-        onPress={onPress}
-        style={({ pressed }) => [style, pressed && pressedStyle]}
-      >
-        <Animated.View style={{ transform: [{ scale }], width: '100%', alignItems: 'center', justifyContent: 'center' }}>
-          {children}
-        </Animated.View>
-      </Pressable>
-    );
-  };
-
-  const KeypadButton = ({ char, isAction = false }: { char: string; isAction?: boolean }) => (
-    <AnimatedPressable
-      style={[styles.keypadButton, isAction && styles.keypadButtonAction]}
-      pressedStyle={styles.keypadButtonPressed}
-      onPress={() => handleKeyPress(char)}
-    >
-      <Text style={[styles.keypadButtonText, isAction && styles.keypadButtonTextAction]}>
-        {char}
-      </Text>
-    </AnimatedPressable>
-  );
-
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Convert</Text>
-      </View>
-
-      {/* Layer 1: The Main Card */}
-      <View style={styles.mainCard}>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      
+      {/* Top Split Panels */}
+      <View style={styles.splitContainer}>
         
-        {/* Layer 2: Input Field */}
-        <View style={styles.currencyPanel}>
-          <View style={styles.currencyTopRow}>
-            <View style={styles.pillSelector}>
-              <Text style={styles.flag}>{isAudToUsd ? '🇦🇺' : '🇺🇸'}</Text>
-              <Text style={styles.currencyCode}>{isAudToUsd ? 'AUD' : 'USD'}</Text>
-            </View>
+        {/* LEFT PANEL */}
+        <View style={[styles.panel, { backgroundColor: LEFT_COLOR, paddingTop: insets.top }]}>
+          <View style={styles.headerRowLeft}>
+            <Text style={styles.headerLogo}>¢uanto</Text>
           </View>
-          <Text style={styles.bigAmountText} numberOfLines={1} adjustsFontSizeToFit>
-            {amount}
-          </Text>
+          <View style={styles.currencyDisplay}>
+            <View style={styles.currencyLabelRow}>
+               <Text style={styles.flag}>{isAudToUsd ? '🇦🇺' : '🇺🇸'}</Text>
+               <Text style={styles.currencyLabel}>{isAudToUsd ? 'AUD' : 'USD'}</Text>
+            </View>
+            <Text style={styles.amountText} numberOfLines={1} adjustsFontSizeToFit>
+              ${formatNumber(amount)}
+            </Text>
+          </View>
         </View>
 
-        {/* Floating Swap Button intersecting the layers */}
+        {/* RIGHT PANEL */}
+        <View style={[styles.panel, { backgroundColor: RIGHT_COLOR, paddingTop: insets.top }]}>
+          <View style={styles.headerRowRight}>
+            <Text style={styles.headerSettings}>settings</Text>
+          </View>
+          <View style={styles.currencyDisplay}>
+            <View style={styles.currencyLabelRow}>
+               {/* No flag strictly in the right panel image usually, but adding for clarity */}
+               <Text style={styles.currencyLabel}>{isAudToUsd ? 'USD' : 'AUD'}</Text>
+            </View>
+            <Text style={styles.amountTextRight} numberOfLines={1} adjustsFontSizeToFit>
+              ${formatNumber(convertedAmount)}
+            </Text>
+          </View>
+        </View>
+
+        {/* CENTER SWAP BULGE */}
         <View style={styles.swapWrapper}>
-          <AnimatedPressable
-            onPress={swapCurrencies}
-            style={styles.swapButton}
-            pressedStyle={styles.swapButtonPressed}
-          >
-            <Animated.View style={{ transform: [{ rotate: spin }] }}>
-              <Ionicons name="swap-vertical" size={26} color={COLORS.textPrimary} />
-            </Animated.View>
-          </AnimatedPressable>
+          <Animated.View style={[styles.swapBulge, animatedBulgeStyle]}>
+            <Pressable onPress={swapCurrencies} style={styles.swapButton}>
+              <Text style={styles.toText}>To</Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+      </View>
+
+      {/* BOTTOM NUMPAD */}
+      <View style={[styles.numpadContainer, { paddingBottom: insets.bottom + 10 }]}>
+        
+        {/* Operator Row */}
+        <View style={styles.operatorRow}>
+          {['+', '×', '+', '-'].map((op, i) => ( // Using the exact operators from the user's reference image
+            <Pressable key={i} style={styles.opButton}>
+              <Text style={styles.opText}>{op}</Text>
+            </Pressable>
+          ))}
         </View>
 
-        {/* Layer 2: Output Field */}
-        <View style={[styles.currencyPanel, styles.currencyPanelOutput]}>
-          <View style={styles.currencyTopRow}>
-            <View style={styles.pillSelector}>
-              <Text style={styles.flag}>{isAudToUsd ? '🇺🇸' : '🇦🇺'}</Text>
-              <Text style={styles.currencyCode}>{isAudToUsd ? 'USD' : 'AUD'}</Text>
+        {/* Numpad Grid */}
+        <View style={styles.keypadGrid}>
+          {[
+            ['1', '2', '3'],
+            ['4', '5', '6'],
+            ['7', '8', '9'],
+            ['C', '0', '⌫']
+          ].map((row, rowIndex) => (
+            <View key={rowIndex} style={styles.keypadRow}>
+              {row.map((key) => (
+                <Pressable
+                  key={key}
+                  onPress={() => handleKeyPress(key)}
+                  style={({ pressed }) => [
+                    styles.keyButton,
+                    { opacity: pressed ? 0.4 : 1 }
+                  ]}
+                >
+                  {key === '⌫' ? (
+                    <Ionicons name="backspace-outline" size={20} color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.keyText}>{key}</Text>
+                  )}
+                </Pressable>
+              ))}
             </View>
-          </View>
-          <Text style={[styles.bigAmountText, styles.convertedAmountText]} numberOfLines={1} adjustsFontSizeToFit>
-            {convertedAmount}
-          </Text>
+          ))}
         </View>
 
-        <View style={styles.rateBadge}>
-          <Ionicons name="trending-up" size={14} color={COLORS.accent} style={{ marginRight: 6 }} />
-          <Text style={styles.rateText}>
-            {exchangeRate ? `1 ${isAudToUsd ? 'AUD' : 'USD'} = ${exchangeRate.toFixed(4)} ${isAudToUsd ? 'USD' : 'AUD'}` : 'Updating rate...'}
-          </Text>
-        </View>
       </View>
-
-      <View style={{ flex: 1 }} />
-
-      {/* Modern Keypad taking up the bottom area */}
-      <View style={styles.keypadArea}>
-        <View style={styles.keypadRow}>
-          <KeypadButton char="7" />
-          <KeypadButton char="8" />
-          <KeypadButton char="9" />
-        </View>
-        <View style={styles.keypadRow}>
-          <KeypadButton char="4" />
-          <KeypadButton char="5" />
-          <KeypadButton char="6" />
-        </View>
-        <View style={styles.keypadRow}>
-          <KeypadButton char="1" />
-          <KeypadButton char="2" />
-          <KeypadButton char="3" />
-        </View>
-        <View style={styles.keypadRow}>
-          <KeypadButton char="." />
-          <KeypadButton char="0" />
-          <KeypadButton char="⌫" isAction />
-        </View>
-        <AnimatedPressable
-           onPress={() => handleKeyPress('C')}
-           style={styles.clearButton}
-           pressedStyle={styles.clearButtonPressed}
-        >
-          <Text style={styles.clearButtonText}>Clear</Text>
-        </AnimatedPressable>
-      </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: NUMPAD_BG,
+  },
+  splitContainer: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  panel: {
+    flex: 1,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    justifyContent: 'space-between',
+    paddingBottom: 24,
   },
-  header: {
-    marginTop: 10,
-    marginBottom: 24,
-    alignItems: 'center',
+  headerRowLeft: {
+    paddingTop: 14,
+    alignItems: 'flex-start',
   },
-  headerTitle: {
-    fontSize: 22,
+  headerRowRight: {
+    paddingTop: 14,
+    alignItems: 'flex-end',
+  },
+  headerLogo: {
+    color: '#FFFFFF',
+    fontSize: 18,
     fontWeight: '800',
-    color: COLORS.textPrimary,
-    letterSpacing: 0.5,
+    letterSpacing: -0.5,
   },
-  mainCard: {
-    backgroundColor: COLORS.cardLayer1,
-    borderRadius: 36, // Large rounded cards
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.4,
-    shadowRadius: 30,
-    elevation: 10,
+  headerSettings: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 16,
+    fontWeight: '500',
   },
-  currencyPanel: {
-    backgroundColor: COLORS.cardLayer2, // Layered panel
-    borderRadius: 24,
-    padding: 20,
-    minHeight: 120,
-    justifyContent: 'center',
+  currencyDisplay: {
+    alignItems: 'flex-start',
   },
-  currencyPanelOutput: {
-    backgroundColor: '#0a84ff15', // Tinted output layer for strong color theme
-    borderWidth: 1,
-    borderColor: '#0a84ff30',
-  },
-  currencyTopRow: {
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  pillSelector: {
+  currencyLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF10',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    marginBottom: 4,
   },
   flag: {
-    fontSize: 18,
-    marginRight: 6,
+    fontSize: 14,
+    marginRight: 4,
   },
-  currencyCode: {
+  currencyLabel: {
+    color: 'rgba(255,255,255,0.85)',
     fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
+    fontWeight: '500',
   },
-  bigAmountText: {
-    fontSize: 56, // Big typography
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    letterSpacing: -1,
+  amountText: {
+    color: '#FFFFFF',
+    fontSize: 38,
+    fontWeight: '500',
+    letterSpacing: -0.5,
   },
-  convertedAmountText: {
-    color: '#0A84FF', // Strong color theme
+  amountTextRight: {
+    color: '#FFFFFF',
+    fontSize: 38,
+    fontWeight: '600',
+    letterSpacing: -0.5,
   },
   swapWrapper: {
-    alignItems: 'center',
+    position: 'absolute',
+    left: '50%',
+    bottom: 52, // Align roughly with where the middle of the currency text sits
     zIndex: 10,
-    marginVertical: -18, // Overlapping layers technique
+    transform: [{ translateY: 25 }],
+  },
+  swapBulge: {
+    position: 'absolute', // Ensures we can perfectly center it
+    left: -25, // Move left by half width to center on the split
+    top: -25, // Move up by half height to center on the bottom line calculation
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: RIGHT_COLOR, // Creates the deep red bulge seamlessly integrating into the right panel!
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   swapButton: {
-    backgroundColor: '#0A84FF', // Strong vibrant accent
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
-    borderColor: COLORS.cardLayer1, // Creates a cutout effect
-    shadowColor: '#0A84FF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
   },
-  swapButtonPressed: {
-    backgroundColor: COLORS.accentBright,
-  },
-  rateBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 28,
-    backgroundColor: '#FFFFFF08',
-    alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  rateText: {
-    color: COLORS.textSecondary,
+  toText: {
+    color: 'rgba(255,255,255,0.8)',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  keypadArea: {
-    paddingTop: 10,
+  numpadContainer: {
+    backgroundColor: NUMPAD_BG,
+  },
+  operatorRow: {
+    flexDirection: 'row',
+    height: 48,
+    backgroundColor: 'rgba(0,0,0,0.06)', // Subtle darkening to match image
+  },
+  opButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRightWidth: 1,
+    borderColor: 'rgba(0,0,0,0.02)', // Minimal lines between operators
+  },
+  opText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '500',
+  },
+  keypadGrid: {
+    paddingHorizontal: 10,
+    paddingTop: 20,
   },
   keypadRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  keypadButton: {
-    backgroundColor: COLORS.cardLayer1,
-    width: '31%',
-    aspectRatio: 1.6,
-    borderRadius: 24, // Rounded buttons matching aesthetic
+  keyButton: {
+    flex: 1,
+    height: 64, // Taller buttons for easy thumb tapping as per image proportions
     justifyContent: 'center',
     alignItems: 'center',
   },
-  keypadButtonPressed: {
-    backgroundColor: COLORS.cardLayer2,
-  },
-  keypadButtonAction: {
-    backgroundColor: '#FF453A15',
-  },
-  keypadButtonText: {
-    fontSize: 32, // Strong typography on buttons
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  keypadButtonTextAction: {
-    color: COLORS.danger,
-  },
-  clearButton: {
-    backgroundColor: '#FFFFFF05',
-    width: '100%',
-    paddingVertical: 20,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  clearButtonPressed: {
-    backgroundColor: '#FFFFFF10',
-  },
-  clearButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
+  keyText: {
+    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '400',
   },
 });
