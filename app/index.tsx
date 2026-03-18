@@ -5,9 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing, withSpring, withSequence } from 'react-native-reanimated';
 
 // Sample colors based on the image
-const LEFT_COLOR = '#FF0D2A';
-const RIGHT_COLOR = '#4E000B';
-const NUMPAD_BG = '#FF0D2A';
+const AUD_COLOR = '#FFCD00';
+const USD_COLOR = '#0A3161';
 
 export default function Index() {
   const insets = useSafeAreaInsets();
@@ -19,6 +18,15 @@ export default function Index() {
 
   // Animation for the swap bulge
   const swapScale = useSharedValue(1);
+
+  const leftBgColor = isAudToUsd ? AUD_COLOR : USD_COLOR;
+  const rightBgColor = isAudToUsd ? USD_COLOR : AUD_COLOR;
+  const leftTextColor = isAudToUsd ? '#000000' : '#FFFFFF';
+  const rightTextColor = isAudToUsd ? '#FFFFFF' : '#000000';
+  const leftSubTextColor = isAudToUsd ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.85)';
+  const rightSubTextColor = isAudToUsd ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.6)';
+  const leftOverlayColor = isAudToUsd ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)';
+  const leftBorderColor = isAudToUsd ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.1)';
 
   const fetchRate = async () => {
     try {
@@ -86,39 +94,39 @@ export default function Index() {
   });
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+    <View style={[styles.container, { backgroundColor: leftBgColor }]}>
+      <StatusBar barStyle={isAudToUsd ? "dark-content" : "light-content"} backgroundColor="transparent" translucent />
       
       {/* Top Split Panels */}
       <View style={styles.splitContainer}>
         
         {/* LEFT PANEL */}
-        <View style={[styles.panel, { backgroundColor: LEFT_COLOR, paddingTop: insets.top }]}>
+        <View style={[styles.panel, { backgroundColor: leftBgColor, paddingTop: insets.top }]}>
           <View style={styles.headerRowLeft}>
-            <Text style={styles.headerLogo}>¢uanto</Text>
+            <Text style={[styles.headerLogo, { color: leftTextColor }]}>¢uanto</Text>
           </View>
           <View style={styles.currencyDisplay}>
             <View style={styles.currencyLabelRow}>
                <Text style={styles.flag}>{isAudToUsd ? '🇦🇺' : '🇺🇸'}</Text>
-               <Text style={styles.currencyLabel}>{isAudToUsd ? 'AUD' : 'USD'}</Text>
+               <Text style={[styles.currencyLabel, { color: leftSubTextColor }]}>{isAudToUsd ? 'AUD' : 'USD'}</Text>
             </View>
-            <Text style={styles.amountText} numberOfLines={1} adjustsFontSizeToFit>
+            <Text style={[styles.amountText, { color: leftTextColor }]} numberOfLines={1} adjustsFontSizeToFit>
               ${formatNumber(amount)}
             </Text>
           </View>
         </View>
 
         {/* RIGHT PANEL */}
-        <View style={[styles.panel, { backgroundColor: RIGHT_COLOR, paddingTop: insets.top }]}>
+        <View style={[styles.panel, { backgroundColor: rightBgColor, paddingTop: insets.top }]}>
           <View style={styles.headerRowRight}>
-            <Text style={styles.headerSettings}>settings</Text>
+            <Text style={[styles.headerSettings, { color: rightSubTextColor }]}>settings</Text>
           </View>
           <View style={styles.currencyDisplay}>
             <View style={styles.currencyLabelRow}>
                {/* No flag strictly in the right panel image usually, but adding for clarity */}
-               <Text style={styles.currencyLabel}>{isAudToUsd ? 'USD' : 'AUD'}</Text>
+               <Text style={[styles.currencyLabel, { color: rightSubTextColor }]}>{isAudToUsd ? 'USD' : 'AUD'}</Text>
             </View>
-            <Text style={styles.amountTextRight} numberOfLines={1} adjustsFontSizeToFit>
+            <Text style={[styles.amountTextRight, { color: rightTextColor }]} numberOfLines={1} adjustsFontSizeToFit>
               ${formatNumber(convertedAmount)}
             </Text>
           </View>
@@ -126,22 +134,22 @@ export default function Index() {
 
         {/* CENTER SWAP BULGE */}
         <View style={styles.swapWrapper}>
-          <Animated.View style={[styles.swapBulge, animatedBulgeStyle]}>
+          <Animated.View style={[styles.swapBulge, animatedBulgeStyle, { backgroundColor: rightBgColor }]}>
             <Pressable onPress={swapCurrencies} style={styles.swapButton}>
-              <Text style={styles.toText}>To</Text>
+              <Text style={[styles.toText, { color: rightSubTextColor }]}>To</Text>
             </Pressable>
           </Animated.View>
         </View>
       </View>
 
       {/* BOTTOM NUMPAD */}
-      <View style={[styles.numpadContainer, { paddingBottom: insets.bottom + 10 }]}>
+      <View style={[styles.numpadContainer, { backgroundColor: leftBgColor, paddingBottom: insets.bottom + 10 }]}>
         
         {/* Operator Row */}
-        <View style={styles.operatorRow}>
+        <View style={[styles.operatorRow, { backgroundColor: leftOverlayColor }]}>
           {['+', '×', '+', '-'].map((op, i) => ( // Using the exact operators from the user's reference image
-            <Pressable key={i} style={styles.opButton}>
-              <Text style={styles.opText}>{op}</Text>
+            <Pressable key={i} style={[styles.opButton, { borderColor: leftBorderColor }]}>
+              <Text style={[styles.opText, { color: leftTextColor }]}>{op}</Text>
             </Pressable>
           ))}
         </View>
@@ -165,9 +173,9 @@ export default function Index() {
                   ]}
                 >
                   {key === '⌫' ? (
-                    <Ionicons name="backspace-outline" size={20} color="#FFFFFF" />
+                    <Ionicons name="backspace-outline" size={20} color={leftTextColor} />
                   ) : (
-                    <Text style={styles.keyText}>{key}</Text>
+                    <Text style={[styles.keyText, { color: leftTextColor }]}>{key}</Text>
                   )}
                 </Pressable>
               ))}
@@ -183,7 +191,6 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: NUMPAD_BG,
   },
   splitContainer: {
     flex: 1,
@@ -257,7 +264,6 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: RIGHT_COLOR, // Creates the deep red bulge seamlessly integrating into the right panel!
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -273,19 +279,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   numpadContainer: {
-    backgroundColor: NUMPAD_BG,
   },
   operatorRow: {
     flexDirection: 'row',
     height: 48,
-    backgroundColor: 'rgba(0,0,0,0.06)', // Subtle darkening to match image
   },
   opButton: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     borderRightWidth: 1,
-    borderColor: 'rgba(0,0,0,0.02)', // Minimal lines between operators
   },
   opText: {
     color: '#FFFFFF',
